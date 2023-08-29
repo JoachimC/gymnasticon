@@ -16,8 +16,8 @@ export function createDropoutFilter() {
    * @param {number} curr.power - power (watts)
    * @param {number} curr.cadence - cadence (rpm)
    * @returns {object} fixed - fixed stats payload
-   * @returns {object} fixed.power - fixed power (watts)
-   * @returns {object} fixed.cadence - cadence
+   * @returns {number} fixed.power - fixed power (watts)
+   * @returns {number} fixed.cadence - cadence
    */
   return function (curr) {
     let fixed = {...curr};

@@ -10,6 +10,7 @@ import {Simulation} from './simulation';
 import {Timer} from '../util/timer';
 import {Logger} from '../util/logger';
 import {createAntStick} from '../util/ant-stick';
+import {createDropoutFilter} from '../util/dropout-filter';
 
 const debuglog = require('debug')('gym:app:app');
 
@@ -105,6 +106,7 @@ export class App {
         throw new Error(`Bluetooth adapter state: ${state}`);
 
       this.logger.log('connecting to bike...');
+      this.fixDropout = createDropoutFilter();
       this.bike = await createBikeClient(this.opts, noble);
       this.bike.on('disconnect', this.onBikeDisconnect.bind(this));
       this.bike.on('stats', this.onBikeStats.bind(this));
@@ -140,12 +142,20 @@ export class App {
   onBikeStats({ power, cadence }) {
     power = power > 0 ? Math.max(0, Math.round(power * this.powerScale + this.powerOffset)) : 0;
     this.logger.log(`received stats from bike [power=${power}W cadence=${cadence}rpm]`);
+    const fixed = this.fixDropout({ power, cadence });
+    if (fixed.power !== power) {
+      this.logger.log(`*** replaced zero power with previous power ${fixed.power}`);
+    }
+    if (fixed.cadence !== cadence) {
+      this.logger.log(`*** replaced zero cadence with previous cadence ${fixed.cadence}`);
+    }
+
     this.statsTimeout.reset();
-    this.power = power;
-    this.simulation.cadence = cadence;
+    this.power = fixed.power;
+    this.simulation.cadence = fixed.cadence;
     let {crank} = this;
-    this.server.updateMeasurement({ power, crank });
-    this.antServer.updateMeasurement({ power, cadence });
+    this.server.updateMeasurement({ fixed.power, crank });
+    this.antServer.updateMeasurement({ fixed.power, fixed.cadence });
   }
 
   onBikeStatsTimeout() {
